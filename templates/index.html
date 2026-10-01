@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Slot Booking Bot — Setup</title>
+<style>
+  body { font-family: -apple-system, Arial, sans-serif; max-width: 700px; margin: 40px auto; background:#f7f7f9; color:#222; }
+  h1 { font-size: 22px; }
+  .card { background:#fff; border:1px solid #e0e0e0; border-radius:10px; padding:20px; margin-bottom:20px; }
+  label { display:block; font-size:13px; font-weight:600; margin-top:12px; margin-bottom:4px; }
+  input[type=text] { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; }
+  button { margin-top:16px; padding:10px 18px; background:#5b47e0; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:14px; }
+  button.del { background:#e05b5b; padding:6px 10px; font-size:12px; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  td, th { padding:8px; border-bottom:1px solid #eee; text-align:left; font-size:14px; }
+  .status-waiting { color:#a06a00; }
+  .status-booked { color:#1a8a3c; font-weight:600; }
+  .status-failed { color:#c0392b; font-weight:600; }
+  .hint { color:#777; font-size:12px; margin-top:4px; }
+  .next-steps { background:#fff8e6; border:1px solid #f0d878; padding:14px; border-radius:8px; font-size:14px; }
+</style>
+</head>
+<body>
+
+<h1>🎯 Slots you want booked</h1>
+
+<div class="card">
+  <form method="POST" action="/add">
+    <label>Hall / Room</label>
+    <input type="text" name="hall" placeholder="e.g. Lab 3 / Seminar Hall 2" required>
+
+    <label>Date</label>
+    <input type="text" name="date" id="date-input" placeholder="e.g. Sep 10, 2026" required>
+    <div class="hint">Type it the same way the portal shows it, e.g. "Sep 10, 2026".</div>
+
+    <label>Timing</label>
+    <input type="text" name="timing" placeholder="e.g. 9:00 AM or 09:00-10:00" required>
+
+    <label>Type</label>
+    <input type="text" name="type" placeholder="e.g. Project Review / Lab Practical / Viva">
+    <div class="hint">Type as much of the exact wording as it appears on the portal — the bot matches this text against each open slot.</div>
+
+    <label>Purpose for attending</label>
+    <input type="text" name="purpose" placeholder="e.g. Project review submission" required>
+    <div class="hint">This gets typed into the "Purpose" box automatically before the bot clicks Book Now.</div>
+
+    <button type="submit">+ Add slot to watch list</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Watch list (<span id="slot-count">{{ slots|length }}</span>)</h3>
+  <div id="watch-list-body">
+  {% if not slots %}
+    <p class="hint">No slots added yet.</p>
+  {% else %}
+  <table>
+    <tr><th>Hall</th><th>Date</th><th>Timing</th><th>Type</th><th>Purpose</th><th>Status</th><th>Result</th><th></th></tr>
+    {% for s in slots %}
+    <tr>
+      <td>{{ s.hall }}</td>
+      <td>{{ s.date }}</td>
+      <td>{{ s.timing }}</td>
+      <td>{{ s.type }}</td>
+      <td>{{ s.purpose }}</td>
+      <td class="status-{{ s.status }}">{{ s.status }}</td>
+      <td class="hint">{{ s.message }}</td>
+      <td>
+        <form method="POST" action="/delete/{{ loop.index0 }}" style="margin:0;">
+          <button type="submit" class="del">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  </div>
+</div>
+
+<div class="next-steps">
+  <strong>Next step:</strong> once your watch list looks right, open a terminal and run:<br>
+  <code>python bot.py</code><br>
+  It will log in, then keep checking every few seconds and book any slot above the moment it opens — trying all of them, not stopping after the first.
+</div>
+
+<script>
+// Pre-fills the Date field with today's date, in the same format the
+// portal shows ("Sep 7, 2026") -- you can still overwrite it for a
+// future day.
+(function () {
+  const dateInput = document.getElementById("date-input");
+  if (dateInput && !dateInput.value) {
+    const today = new Date().toLocaleDateString("en-US", {
+      month: "short", day: "numeric", year: "numeric"
+    });
+    dateInput.value = today;
+  }
+})();
+
+// Refreshes ONLY the watch-list table below every 5s -- never touches
+// the "Add slot" form above, so you can type at any pace without losing input.
+function statusClass(s) {
+  if (s === "booked") return "status-booked";
+  if (s === "failed") return "status-failed";
+  return "status-waiting";
+}
+
+async function refreshWatchList() {
+  try {
+    const res = await fetch("/api/slots");
+    const data = await res.json();
+    const slots = data.slots || [];
+    document.getElementById("slot-count").textContent = slots.length;
+
+    const container = document.getElementById("watch-list-body");
+    if (slots.length === 0) {
+      container.innerHTML = '<p class="hint">No slots added yet.</p>';
+      return;
+    }
+
+    let html = '<table><tr><th>Hall</th><th>Date</th><th>Timing</th><th>Type</th><th>Purpose</th><th>Status</th><th>Result</th><th></th></tr>';
+    slots.forEach((s, i) => {
+      html += `<tr>
+        <td>${s.hall || ""}</td>
+        <td>${s.date || ""}</td>
+        <td>${s.timing || ""}</td>
+        <td>${s.type || ""}</td>
+        <td>${s.purpose || ""}</td>
+        <td class="${statusClass(s.status)}">${s.status || ""}</td>
+        <td class="hint">${s.message || ""}</td>
+        <td>
+          <form method="POST" action="/delete/${i}" style="margin:0;">
+            <button type="submit" class="del">Remove</button>
+          </form>
+        </td>
+      </tr>`;
+    });
+    html += "</table>";
+    container.innerHTML = html;
+  } catch (e) {
+    console.error("Could not refresh watch list:", e);
+  }
+}
+
+setInterval(refreshWatchList, 5000);
+</script>
+
+</body>
+</html>

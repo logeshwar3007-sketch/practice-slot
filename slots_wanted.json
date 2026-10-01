@@ -1,0 +1,20 @@
+[
+  {
+    "hall": "1611",
+    "date": "Sep 30, 2026",
+    "timing": "1:15 p.m. - 2:44 p.m.",
+    "type": "VIVA",
+    "purpose": "viva",
+    "status": "booked",
+    "message": "Event session booked successfully."
+  },
+  {
+    "hall": "1731",
+    "date": "Sep 30, 2026",
+    "timing": "3 p.m. - 4:29 p.m.",
+    "type": "Module",
+    "purpose": "module",
+    "status": "booked",
+    "message": "Event session booked successfully."
+  }
+]
